@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FixMyStreets 3D Map</title>
+  <script src="https://unpkg.com/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
+  <link href="https://unpkg.com/cesium@1.124.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    html, body { margin: 0; height: 100%; }
+    #cesiumContainer { width: 100%; height: 100%; }
+    .cesium-widget-credits { display: none; }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  <script>
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      imageryProvider: new Cesium.OpenStreetMapImageryProvider({
+        url : 'https://a.tile.openstreetmap.org/'
+      }),
+      terrainProvider: Cesium.createWorldTerrain(),
+      sceneMode : Cesium.SceneMode.SCENE3D,
+      selectionIndicator: false,
+      navigationHelpButton: false
+    });
+
+    // Load 3D buildings
+    const osmBuildings = new Cesium.Cesium3DTileset({
+      url: 'https://assets.cesium.com/1/tileset.json'
+    });
+    viewer.scene.primitives.add(osmBuildings);
+
+    // Load saved pins from LocalStorage
+    const savedPins = JSON.parse(localStorage.getItem('pins')) || [];
+    savedPins.forEach(pin => {
+      addPin(pin.longitude, pin.latitude, pin.name, true);
+    });
+
+    // Add a pin to the map
+    function addPin(longitude, latitude, name, isConfirmed = false) {
+      const position = Cesium.Cartesian3.fromDegrees(longitude, latitude);
+      const pinBuilder = new Cesium.PinBuilder();
+      const pin = viewer.entities.add({
+        position: position,
+        billboard: {
+          image: pinBuilder.fromText(name.charAt(0), Cesium.Color.RED, 48).toDataURL(),
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM
+        },
+        label: {
+          text: name,
+          font: '14px sans-serif',
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          outlineWidth: 2,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -25)
+        }
+      });
+
+      if (!isConfirmed) {
+        pin.billboard.scale = 0.5; // Make temporary pins smaller
+        pin.position = new Cesium.CallbackProperty(() => pin.position.getValue(Cesium.JulianDate.now()), false);
+
+        // Make the pin draggable
+        let handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        handler.setInputAction((movement) => {
+          const ray = viewer.camera.getPickRay(movement.endPosition);
+          const newPosition = viewer.scene.globe.pick(ray, viewer.scene);
+          if (Cesium.defined(newPosition)) {
+            pin.position = newPosition;
+          }
+        }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+        // Confirm the pin
+        handler.setInputAction(() => {
+          const name = prompt("Enter a name for this pin:", "Pinned Location") || "Pinned Location";
+          pin.label.text = name;
+          pin.billboard.image = pinBuilder.fromText(name.charAt(0), Cesium.Color.RED, 48).toDataURL();
+          pin.billboard.scale = 1; // Make confirmed pins normal size
+          handler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+          savePins();
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+      }
+    }
+
+    // Save all pins to LocalStorage
+    function savePins() {
+      const pins = [];
+      viewer.entities.values.forEach(entity => {
+        if (entity.billboard) {
+          const position = entity.position.getValue(Cesium.JulianDate.now());
+          const cartographic = Cesium.Cartographic.fromCartesian(position);
+          const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+          const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+          const name = entity.label.text;
+          pins.push({ longitude, latitude, name });
+        }
+      });
+      localStorage.setItem('pins', JSON.stringify(pins));
+    }
+
+    // Add a pin on click
+    viewer.screenSpaceEventHandler.setInputAction((click) => {
+      const ray = viewer.camera.getPickRay(click.position);
+      const newPosition = viewer.scene.globe.pick(ray, viewer.scene);
+      if (Cesium.defined(newPosition)) {
+        const cartographic = Cesium.Cartographic.fromCartesian(newPosition);
+        const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+        const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+        addPin(longitude, latitude, "Temporary Pin");
+      }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  </script>
+</body>
+</html>
