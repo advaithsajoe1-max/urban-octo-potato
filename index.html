@@ -88,40 +88,49 @@ const firebaseConfig = {
       maxZoom: 19
     }).addTo(map);
 
-    const markerMap = {}; // Store existing markers
+    const markerMap = {};
 
-    // Load pins from Firebase
+    // Load existing pins from Firebase
     db.ref("pins").on("value", snapshot => {
       const pins = snapshot.val() || {};
       // Remove old markers
       Object.values(markerMap).forEach(marker => map.removeLayer(marker));
       Object.keys(markerMap).forEach(key => delete markerMap[key]);
 
-      // Add markers
       Object.keys(pins).forEach(id => {
         const { lat, lng, name } = pins[id];
         const marker = L.marker([lat, lng], { draggable: false }).addTo(map);
 
         marker.on("click", () => {
           const popupContent = document.createElement('div');
-          popupContent.innerHTML = `
-            <input id="edit-name-${id}" class="pin-name" value="${name}"/><br>
-            <button id="save-${id}">💾 Save</button>
-            <button id="delete-${id}">🗑️ Delete</button>
-          `;
+          const input = document.createElement('input');
+          input.className = "pin-name";
+          input.value = name;
+          popupContent.appendChild(input);
+
+          popupContent.appendChild(document.createElement('br'));
+
+          const saveBtn = document.createElement('button');
+          saveBtn.innerText = "💾 Save";
+          saveBtn.style.marginRight = "5px";
+          popupContent.appendChild(saveBtn);
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.innerText = "🗑️ Delete";
+          popupContent.appendChild(deleteBtn);
+
           marker.bindPopup(popupContent).openPopup();
 
-          setTimeout(() => {
-            document.getElementById(`save-${id}`).onclick = () => {
-              const newName = document.getElementById(`edit-name-${id}`).value || "Unnamed Pin";
-              db.ref("pins/" + id).update({ name: newName });
-              marker.closePopup();
-            };
-            document.getElementById(`delete-${id}`).onclick = () => {
-              db.ref("pins/" + id).remove();
-              map.removeLayer(marker);
-            };
-          }, 200);
+          saveBtn.onclick = () => {
+            const newName = input.value || "Unnamed Pin";
+            db.ref("pins/" + id).update({ name: newName });
+            marker.closePopup();
+          };
+
+          deleteBtn.onclick = () => {
+            db.ref("pins/" + id).remove();
+            map.removeLayer(marker);
+          };
         });
 
         markerMap[id] = marker;
@@ -130,29 +139,40 @@ const firebaseConfig = {
 
     // Add new pin
     map.on('click', e => {
-      const lat = e.latlng.lat.toFixed(4);
-      const lng = e.latlng.lng.toFixed(4);
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
 
       const tempMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
 
       const popupContent = document.createElement('div');
-      popupContent.innerHTML = `
-        <input id="pin-name-${lat}-${lng}" class="pin-name" placeholder="Enter name"/><br>
-        <button id="confirm-${lat}-${lng}">✅ Confirm</button>
-        <button id="cancel-${lat}-${lng}">❌ Cancel</button>
-      `;
+      const input = document.createElement('input');
+      input.placeholder = "Enter pin name";
+      input.className = "pin-name";
+      popupContent.appendChild(input);
+
+      popupContent.appendChild(document.createElement('br'));
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.innerText = "✅ Confirm";
+      confirmBtn.style.marginRight = "5px";
+      popupContent.appendChild(confirmBtn);
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.innerText = "❌ Cancel";
+      popupContent.appendChild(cancelBtn);
+
       tempMarker.bindPopup(popupContent).openPopup();
 
-      setTimeout(() => {
-        document.getElementById(`confirm-${lat}-${lng}`).onclick = () => {
-          const name = document.getElementById(`pin-name-${lat}-${lng}`).value || "Unnamed Pin";
-          db.ref("pins").push({ lat, lng, name }); // Save permanently
-          map.removeLayer(tempMarker); // Firebase load will re-add
-        };
-        document.getElementById(`cancel-${lat}-${lng}`).onclick = () => {
-          map.removeLayer(tempMarker);
-        };
-      }, 200);
+      // Attach handlers
+      confirmBtn.onclick = () => {
+        const name = input.value || "Unnamed Pin";
+        db.ref("pins").push({ lat, lng, name });
+        map.removeLayer(tempMarker);
+      };
+
+      cancelBtn.onclick = () => {
+        map.removeLayer(tempMarker);
+      };
     });
 
     // Locate user
