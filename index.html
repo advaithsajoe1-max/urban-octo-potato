@@ -66,7 +66,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
   <script>
-    // 🔥 Firebase config (replace with your own)
+    // 🔥 Replace with your Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyBuQI813zZeJj4RSlU2_fsBb20lWTCqa7o",
   authDomain: "urban-renew-map.firebaseapp.com",
@@ -88,64 +88,66 @@ const firebaseConfig = {
       maxZoom: 19
     }).addTo(map);
 
-    // 🏷️ Store markers with their Firebase key
-    const markerMap = {};
+    const markerMap = {}; // Store existing markers
 
-    // Load all pins from Firebase
-    db.ref("pins").on("value", (snapshot) => {
+    // Load pins from Firebase
+    db.ref("pins").on("value", snapshot => {
+      const pins = snapshot.val() || {};
       // Remove old markers
       Object.values(markerMap).forEach(marker => map.removeLayer(marker));
       Object.keys(markerMap).forEach(key => delete markerMap[key]);
 
-      const pins = snapshot.val();
-      if (pins) {
-        Object.keys(pins).forEach(id => {
-          const { lat, lng, name } = pins[id];
-          const marker = L.marker([lat, lng], { draggable: false }).addTo(map);
+      // Add markers
+      Object.keys(pins).forEach(id => {
+        const { lat, lng, name } = pins[id];
+        const marker = L.marker([lat, lng], { draggable: false }).addTo(map);
 
-          function showEditPopup() {
-            marker.bindPopup(`
-              <input id="edit-name-${id}" class="pin-name" value="${name}"/><br>
-              <button id="save-${id}">💾 Save</button>
-              <button id="delete-${id}">🗑️ Delete</button>
-            `).openPopup();
+        marker.on("click", () => {
+          const popupContent = document.createElement('div');
+          popupContent.innerHTML = `
+            <input id="edit-name-${id}" class="pin-name" value="${name}"/><br>
+            <button id="save-${id}">💾 Save</button>
+            <button id="delete-${id}">🗑️ Delete</button>
+          `;
+          marker.bindPopup(popupContent).openPopup();
 
-            setTimeout(() => {
-              document.getElementById(`save-${id}`).onclick = () => {
-                const newName = document.getElementById(`edit-name-${id}`).value || "Unnamed Pin";
-                db.ref("pins/" + id).update({ name: newName });
-                marker.closePopup();
-              };
-              document.getElementById(`delete-${id}`).onclick = () => {
-                db.ref("pins/" + id).remove();
-                map.removeLayer(marker);
-              };
-            }, 200);
-          }
-
-          marker.on("click", showEditPopup);
-          markerMap[id] = marker;
+          setTimeout(() => {
+            document.getElementById(`save-${id}`).onclick = () => {
+              const newName = document.getElementById(`edit-name-${id}`).value || "Unnamed Pin";
+              db.ref("pins/" + id).update({ name: newName });
+              marker.closePopup();
+            };
+            document.getElementById(`delete-${id}`).onclick = () => {
+              db.ref("pins/" + id).remove();
+              map.removeLayer(marker);
+            };
+          }, 200);
         });
-      }
+
+        markerMap[id] = marker;
+      });
     });
 
-    // Add new pin with name
-    map.on('click', function(e) {
+    // Add new pin
+    map.on('click', e => {
       const lat = e.latlng.lat.toFixed(4);
       const lng = e.latlng.lng.toFixed(4);
+
       const tempMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
 
-      tempMarker.bindPopup(`
+      const popupContent = document.createElement('div');
+      popupContent.innerHTML = `
         <input id="pin-name-${lat}-${lng}" class="pin-name" placeholder="Enter name"/><br>
         <button id="confirm-${lat}-${lng}">✅ Confirm</button>
         <button id="cancel-${lat}-${lng}">❌ Cancel</button>
-      `).openPopup();
+      `;
+      tempMarker.bindPopup(popupContent).openPopup();
 
       setTimeout(() => {
         document.getElementById(`confirm-${lat}-${lng}`).onclick = () => {
           const name = document.getElementById(`pin-name-${lat}-${lng}`).value || "Unnamed Pin";
-          db.ref("pins").push({ lat, lng, name });
-          map.removeLayer(tempMarker);
+          db.ref("pins").push({ lat, lng, name }); // Save permanently
+          map.removeLayer(tempMarker); // Firebase load will re-add
         };
         document.getElementById(`cancel-${lat}-${lng}`).onclick = () => {
           map.removeLayer(tempMarker);
@@ -156,7 +158,7 @@ const firebaseConfig = {
     // Locate user
     document.getElementById("locateBtn").onclick = () => {
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos) => {
+        navigator.geolocation.getCurrentPosition(pos => {
           const { latitude, longitude } = pos.coords;
           map.setView([latitude, longitude], 15);
           L.marker([latitude, longitude])
