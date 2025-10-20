@@ -59,12 +59,19 @@
         const marker = L.marker([lat, lng]).addTo(map);
 
         marker.on("click", () => {
-          const newName = prompt("Edit pin name:", name);
+          const newName = prompt("Edit pin name (leave empty to delete):", name);
           if (newName === null) return; // Cancelled
+
           if (newName === "") {
-            // Delete pin if empty
-            db.ref("pins/" + id).remove();
-            map.removeLayer(marker);
+            // Ask for password before deleting
+            const password = prompt("Enter password to delete this pin:");
+            if (password === "AT@chat/gpt") {
+              db.ref("pins/" + id).remove();
+              map.removeLayer(marker);
+              alert("Pin deleted!");
+            } else {
+              alert("Incorrect password. Pin not deleted.");
+            }
           } else {
             db.ref("pins/" + id).update({ name: newName });
           }
@@ -97,3 +104,4 @@
   </script>
 </body>
 </html>
+
