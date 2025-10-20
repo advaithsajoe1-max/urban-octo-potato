@@ -39,6 +39,8 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    const PASSWORD = "AT@chat/gpt"; // Password to delete pins
+
     // Initialize map
     const map = L.map('map').setView([22.9734, 78.6569], 5);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -50,7 +52,6 @@
     // Load existing pins from Firebase
     db.ref("pins").on("value", snapshot => {
       const pins = snapshot.val() || {};
-      // Remove old markers
       Object.values(markerMap).forEach(marker => map.removeLayer(marker));
       Object.keys(markerMap).forEach(key => delete markerMap[key]);
 
@@ -63,9 +64,8 @@
           if (newName === null) return; // Cancelled
 
           if (newName === "") {
-            // Ask for password before deleting
             const password = prompt("Enter password to delete this pin:");
-            if (password === "AT@chat/gpt") {
+            if (password === PASSWORD) {
               db.ref("pins/" + id).remove();
               map.removeLayer(marker);
               alert("Pin deleted!");
@@ -81,14 +81,40 @@
       });
     });
 
-    // Add new pin via map click
+    // Add new draggable pin via map click
     map.on('click', e => {
-      const lat = e.latlng.lat;
-      const lng = e.latlng.lng;
-      const name = prompt("Enter pin name:", "Unnamed Pin");
-      if (name !== null && name !== "") {
-        db.ref("pins").push({ lat, lng, name });
-      }
+      let lat = e.latlng.lat;
+      let lng = e.latlng.lng;
+
+      const tempMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
+
+      const savePin = () => {
+        const name = prompt("Enter pin name:", "Unnamed Pin");
+        if (name !== null && name !== "") {
+          const pos = tempMarker.getLatLng();
+          db.ref("pins").push({ lat: pos.lat, lng: pos.lng, name });
+          map.removeLayer(tempMarker);
+        } else {
+          alert("Pin not saved.");
+        }
+      };
+
+      const cancelPin = () => {
+        const password = prompt("Enter password to cancel this pin:");
+        if (password === PASSWORD) {
+          map.removeLayer(tempMarker);
+          alert("Pin removed.");
+        } else {
+          alert("Incorrect password. Pin not removed.");
+        }
+      };
+
+      tempMarker.bindPopup("<button id='saveBtn'>💾 Save Pin</button> <button id='cancelBtn'>❌ Cancel Pin</button>").openPopup();
+
+      tempMarker.on('popupopen', () => {
+        document.getElementById('saveBtn').onclick = savePin;
+        document.getElementById('cancelBtn').onclick = cancelPin;
+      });
     });
 
     // Locate user
@@ -104,4 +130,3 @@
   </script>
 </body>
 </html>
-
