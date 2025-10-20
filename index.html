@@ -48,6 +48,13 @@
     #locateBtn:hover {
       background: #3367d6;
     }
+    input.pin-name {
+      width: 90%;
+      padding: 5px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
   </style>
 </head>
 
@@ -60,7 +67,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
   <script>
-    // 🔥 Replace this with your own Firebase config (from your Firebase console)
+    // 🔥 Replace this with your own Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyBuQI813zZeJj4RSlU2_fsBb20lWTCqa7o",
   authDomain: "urban-renew-map.firebaseapp.com",
@@ -70,6 +77,7 @@ const firebaseConfig = {
   appId: "1:138295290989:web:3ae9ce333ebc4a1a6aa364",
   measurementId: "G-6GXK4MHR0Q"
 };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
   </script>
@@ -78,14 +86,14 @@ const firebaseConfig = {
     // 🗺️ Initialize map
     const map = L.map('map').setView([22.9734, 78.6569], 5);
 
-    // Add base map tiles
+    // Add base tiles
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap & CartoDB',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(map);
 
-    // 💾 Load all pins from Firebase
+    // 💾 Load pins from Firebase
     db.ref("pins").on("value", (snapshot) => {
       map.eachLayer((layer) => {
         if (layer instanceof L.Marker) map.removeLayer(layer);
@@ -93,10 +101,10 @@ const firebaseConfig = {
       const pins = snapshot.val();
       if (pins) {
         Object.keys(pins).forEach((id) => {
-          const { lat, lng } = pins[id];
+          const { lat, lng, name } = pins[id];
           L.marker([lat, lng])
             .addTo(map)
-            .bindPopup(`📍 Confirmed Pin<br>Lat: ${lat}<br>Lng: ${lng}`);
+            .bindPopup(`<b>${name || "Unnamed Pin"}</b><br>Lat: ${lat}<br>Lng: ${lng}`);
         });
       }
     });
@@ -108,21 +116,23 @@ const firebaseConfig = {
 
       const tempMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
       tempMarker.bindPopup(`
-        <b>Confirm Pin?</b><br>
-        Lat: ${lat}, Lng: ${lng}<br>
+        <b>Name this pin:</b><br>
+        <input id="pin-name-${lat}-${lng}" class="pin-name" placeholder="Enter name"/><br>
         <button id="confirm-${lat}-${lng}">✅ Confirm</button>
         <button id="cancel-${lat}-${lng}">❌ Cancel</button>
       `).openPopup();
 
+      // Delay so popup renders before we attach events
       setTimeout(() => {
         document.getElementById(`confirm-${lat}-${lng}`).onclick = () => {
-          db.ref("pins").push({ lat, lng });
+          const name = document.getElementById(`pin-name-${lat}-${lng}`).value || "Unnamed Pin";
+          db.ref("pins").push({ lat, lng, name });
           map.removeLayer(tempMarker);
         };
         document.getElementById(`cancel-${lat}-${lng}`).onclick = () => {
           map.removeLayer(tempMarker);
         };
-      }, 200);
+      }, 300);
     });
 
     // 🧭 Locate user’s position
@@ -145,3 +155,4 @@ const firebaseConfig = {
   </script>
 </body>
 </html>
+
