@@ -103,6 +103,19 @@
 
     function locateUser() {
       console.log('locateUser() called');
+      // Save pin to Firebase
+function savePin(lat, lng) {
+  db.ref("pins").push({ lat, lng });
+}
+
+// Load pins on page load
+db.ref("pins").on("value", (snapshot) => {
+  const pins = snapshot.val();
+  for (let id in pins) {
+    const { lat, lng } = pins[id];
+    L.marker([lat, lng]).addTo(map);
+  }
+});
 
       // Quick checks
       if (!navigator.geolocation) {
@@ -169,4 +182,5 @@
   </script>
 </body>
 </html>
+
 
