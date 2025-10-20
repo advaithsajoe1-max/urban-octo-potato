@@ -25,18 +25,17 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
   <script>
-    // 🔥 Replace with your Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyBuQI813zZeJj4RSlU2_fsBb20lWTCqa7o",
-  authDomain: "urban-renew-map.firebaseapp.com",
-  databaseURL: "https://urban-renew-map-default-rtdb.asia-southeast1.firebasedatabase.app/", // 🔹 Add this line
-  projectId: "urban-renew-map",
-  storageBucket: "urban-renew-map.appspot.com",
-  messagingSenderId: "138295290989",
-  appId: "1:138295290989:web:3ae9ce333ebc4a1a6aa364",
-  measurementId: "G-6GXK4MHR0Q"
-};
-
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBuQI813zZeJj4RSlU2_fsBb20lWTCqa7o",
+      authDomain: "urban-renew-map.firebaseapp.com",
+      databaseURL: "https://urban-renew-map-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "urban-renew-map",
+      storageBucket: "urban-renew-map.appspot.com",
+      messagingSenderId: "138295290989",
+      appId: "1:138295290989:web:3ae9ce333ebc4a1a6aa364",
+      measurementId: "G-6GXK4MHR0Q"
+    };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
@@ -63,7 +62,7 @@ const firebaseConfig = {
           const newName = prompt("Edit pin name:", name);
           if (newName === null) return; // Cancelled
           if (newName === "") {
-            // Delete if empty
+            // Delete pin if empty
             db.ref("pins/" + id).remove();
             map.removeLayer(marker);
           } else {
@@ -98,4 +97,3 @@ const firebaseConfig = {
   </script>
 </body>
 </html>
-
