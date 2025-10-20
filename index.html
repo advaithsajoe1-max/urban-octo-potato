@@ -1,30 +1,11 @@
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-
-<script>
-  // Your Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyBuQI813zZeJj4RSlU2_fsBb20lWTCqa7o",
-  authDomain: "urban-renew-map.firebaseapp.com",
-  projectId: "urban-renew-map",
-  storageBucket: "urban-renew-map.firebasestorage.app",
-  messagingSenderId: "138295290989",
-  appId: "1:138295290989:web:3ae9ce333ebc4a1a6aa364",
-  measurementId: "G-6GXK4MHR0Q"
-};
-
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-</script>
-
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Urban Renew - Map System</title>
+  <title>Urban Renew - Community Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
   <style>
     html, body {
       height: 100%;
@@ -38,150 +19,129 @@ const firebaseConfig = {
       border-radius: 10px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     }
-
-    /* Button styling (ensures it's on top and clickable) */
+    .leaflet-popup-content-wrapper {
+      border-radius: 8px;
+      background-color: #ffffff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .leaflet-control-zoom a {
+      background-color: #4285f4;
+      color: white;
+    }
+    .leaflet-control-zoom a:hover {
+      background-color: #3367d6;
+    }
     #locateBtn {
       position: absolute;
-      top: 12px;
-      left: 12px;
-      z-index: 99999;               /* very high so Leaflet panes won't cover it */
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
       background: #4285f4;
       color: white;
       border: none;
-      padding: 10px 14px;
-      border-radius: 6px;
+      padding: 10px 15px;
+      border-radius: 8px;
       cursor: pointer;
-      font-size: 14px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      pointer-events: auto;         /* ensure it receives clicks */
+      font-weight: 600;
     }
-    #locateBtn:hover { background: #3367d6; }
-
-    /* Small message area for status/errors */
-    #status {
-      position: absolute;
-      top: 60px;
-      left: 12px;
-      z-index: 99999;
-      background: rgba(0,0,0,0.7);
-      color: white;
-      padding: 8px 10px;
-      border-radius: 6px;
-      font-size: 13px;
-      display: none;
-      max-width: 320px;
+    #locateBtn:hover {
+      background: #3367d6;
     }
   </style>
 </head>
+
 <body>
   <button id="locateBtn">📍 Find My Location</button>
-  <div id="status"></div>
   <div id="map"></div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
   <script>
-    // Initialize the map (default view on India)
+    // 🔥 Replace this with your own Firebase config (from your Firebase console)
+const firebaseConfig = {
+  apiKey: "AIzaSyBuQI813zZeJj4RSlU2_fsBb20lWTCqa7o",
+  authDomain: "urban-renew-map.firebaseapp.com",
+  projectId: "urban-renew-map",
+  storageBucket: "urban-renew-map.firebasestorage.app",
+  messagingSenderId: "138295290989",
+  appId: "1:138295290989:web:3ae9ce333ebc4a1a6aa364",
+  measurementId: "G-6GXK4MHR0Q"
+};
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
+
+  <script>
+    // 🗺️ Initialize map
     const map = L.map('map').setView([22.9734, 78.6569], 5);
+
+    // Add base map tiles
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap & CartoDB',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(map);
 
-    const statusEl = document.getElementById('status');
-    let userMarker = null;
-
-    function showStatus(msg, timeoutMs = 4000) {
-      statusEl.style.display = 'block';
-      statusEl.textContent = msg;
-      if (timeoutMs) {
-        clearTimeout(showStatus._timer);
-        showStatus._timer = setTimeout(() => {
-          statusEl.style.display = 'none';
-        }, timeoutMs);
+    // 💾 Load all pins from Firebase
+    db.ref("pins").on("value", (snapshot) => {
+      map.eachLayer((layer) => {
+        if (layer instanceof L.Marker) map.removeLayer(layer);
+      });
+      const pins = snapshot.val();
+      if (pins) {
+        Object.keys(pins).forEach((id) => {
+          const { lat, lng } = pins[id];
+          L.marker([lat, lng])
+            .addTo(map)
+            .bindPopup(`📍 Confirmed Pin<br>Lat: ${lat}<br>Lng: ${lng}`);
+        });
       }
-    }
+    });
 
-    function locateUser() {
-      console.log('locateUser() called');
-      // Save pin to Firebase
-function savePin(lat, lng) {
-  db.ref("pins").push({ lat, lng });
-}
+    // 📍 Drop a new pin on map click
+    map.on('click', function(e) {
+      const lat = e.latlng.lat.toFixed(4);
+      const lng = e.latlng.lng.toFixed(4);
 
-// Load pins on page load
-db.ref("pins").on("value", (snapshot) => {
-  const pins = snapshot.val();
-  for (let id in pins) {
-    const { lat, lng } = pins[id];
-    L.marker([lat, lng]).addTo(map);
-  }
-});
+      const tempMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      tempMarker.bindPopup(`
+        <b>Confirm Pin?</b><br>
+        Lat: ${lat}, Lng: ${lng}<br>
+        <button id="confirm-${lat}-${lng}">✅ Confirm</button>
+        <button id="cancel-${lat}-${lng}">❌ Cancel</button>
+      `).openPopup();
 
-      // Quick checks
-      if (!navigator.geolocation) {
-        showStatus('Geolocation not supported by your browser.');
-        console.error('Geolocation API not supported.');
-        return;
+      setTimeout(() => {
+        document.getElementById(`confirm-${lat}-${lng}`).onclick = () => {
+          db.ref("pins").push({ lat, lng });
+          map.removeLayer(tempMarker);
+        };
+        document.getElementById(`cancel-${lat}-${lng}`).onclick = () => {
+          map.removeLayer(tempMarker);
+        };
+      }, 200);
+    });
+
+    // 🧭 Locate user’s position
+    document.getElementById("locateBtn").onclick = () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          const { latitude, longitude } = pos.coords;
+          map.setView([latitude, longitude], 15);
+          L.marker([latitude, longitude])
+            .addTo(map)
+            .bindPopup("📍 You are here!")
+            .openPopup();
+        }, () => {
+          alert("Unable to get your location");
+        });
+      } else {
+        alert("Geolocation not supported");
       }
-
-      // When page is embedded inside iframe, geolocation may be blocked by browser
-      // or by the embedding page not allowing geolocation. Log helpful info.
-      if (window.self !== window.top) {
-        console.warn('Page is running inside an iframe. Geolocation may be blocked by the parent frame.');
-        showStatus('Note: page is in an iframe — geolocation may be blocked. Try opening the page directly.', 8000);
-      }
-
-      // Request location
-      showStatus('Requesting location — please allow the browser prompt...');
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          console.log('Geolocation success', pos);
-
-          // Center map and add/update marker
-          map.setView([lat, lng], 15);
-
-          if (userMarker) {
-            userMarker.setLatLng([lat, lng]);
-          } else {
-            userMarker = L.marker([lat, lng]).addTo(map);
-            userMarker.bindPopup("<b>Your Location</b><br>Lat: " + lat.toFixed(5) + "<br>Lng: " + lng.toFixed(5));
-          }
-          userMarker.openPopup();
-          showStatus('Location found and pinned ✓', 3500);
-        },
-        (err) => {
-          console.error('Geolocation error code', err.code, err.message);
-          switch(err.code) {
-            case err.PERMISSION_DENIED:
-              showStatus('Location permission denied. Allow location access and try again.', 8000);
-              break;
-            case err.POSITION_UNAVAILABLE:
-              showStatus('Position unavailable. Try again or check your device settings.', 6000);
-              break;
-            case err.TIMEOUT:
-              showStatus('Location request timed out. Try again.', 4000);
-              break;
-            default:
-              showStatus('Unable to get location: ' + err.message, 6000);
-          }
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        }
-      );
-    }
-
-    document.getElementById('locateBtn').addEventListener('click', locateUser);
-
-    // Optional: auto-locate on page load (commented out)
-    // window.addEventListener('load', () => locateUser());
+    };
   </script>
 </body>
 </html>
-
-
-
