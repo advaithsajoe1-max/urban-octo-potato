@@ -57,7 +57,6 @@
     }
   </style>
 </head>
-
 <body>
   <button id="locateBtn">📍 Find My Location</button>
   <div id="map"></div>
@@ -67,7 +66,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
   <script>
-    // 🔥 Replace this with your own Firebase config
+    // 🔥 Firebase config (replace with your own)
 const firebaseConfig = {
   apiKey: "AIzaSyBuQI813zZeJj4RSlU2_fsBb20lWTCqa7o",
   authDomain: "urban-renew-map.firebaseapp.com",
@@ -77,52 +76,71 @@ const firebaseConfig = {
   appId: "1:138295290989:web:3ae9ce333ebc4a1a6aa364",
   measurementId: "G-6GXK4MHR0Q"
 };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
   </script>
 
   <script>
-    // 🗺️ Initialize map
     const map = L.map('map').setView([22.9734, 78.6569], 5);
-
-    // Add base tiles
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap & CartoDB',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(map);
 
-    // 💾 Load pins from Firebase
+    // 🏷️ Store markers with their Firebase key
+    const markerMap = {};
+
+    // Load all pins from Firebase
     db.ref("pins").on("value", (snapshot) => {
-      map.eachLayer((layer) => {
-        if (layer instanceof L.Marker) map.removeLayer(layer);
-      });
+      // Remove old markers
+      Object.values(markerMap).forEach(marker => map.removeLayer(marker));
+      Object.keys(markerMap).forEach(key => delete markerMap[key]);
+
       const pins = snapshot.val();
       if (pins) {
-        Object.keys(pins).forEach((id) => {
+        Object.keys(pins).forEach(id => {
           const { lat, lng, name } = pins[id];
-          L.marker([lat, lng])
-            .addTo(map)
-            .bindPopup(`<b>${name || "Unnamed Pin"}</b><br>Lat: ${lat}<br>Lng: ${lng}`);
+          const marker = L.marker([lat, lng], { draggable: false }).addTo(map);
+
+          function showEditPopup() {
+            marker.bindPopup(`
+              <input id="edit-name-${id}" class="pin-name" value="${name}"/><br>
+              <button id="save-${id}">💾 Save</button>
+              <button id="delete-${id}">🗑️ Delete</button>
+            `).openPopup();
+
+            setTimeout(() => {
+              document.getElementById(`save-${id}`).onclick = () => {
+                const newName = document.getElementById(`edit-name-${id}`).value || "Unnamed Pin";
+                db.ref("pins/" + id).update({ name: newName });
+                marker.closePopup();
+              };
+              document.getElementById(`delete-${id}`).onclick = () => {
+                db.ref("pins/" + id).remove();
+                map.removeLayer(marker);
+              };
+            }, 200);
+          }
+
+          marker.on("click", showEditPopup);
+          markerMap[id] = marker;
         });
       }
     });
 
-    // 📍 Drop a new pin on map click
+    // Add new pin with name
     map.on('click', function(e) {
       const lat = e.latlng.lat.toFixed(4);
       const lng = e.latlng.lng.toFixed(4);
-
       const tempMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
+
       tempMarker.bindPopup(`
-        <b>Name this pin:</b><br>
         <input id="pin-name-${lat}-${lng}" class="pin-name" placeholder="Enter name"/><br>
         <button id="confirm-${lat}-${lng}">✅ Confirm</button>
         <button id="cancel-${lat}-${lng}">❌ Cancel</button>
       `).openPopup();
 
-      // Delay so popup renders before we attach events
       setTimeout(() => {
         document.getElementById(`confirm-${lat}-${lng}`).onclick = () => {
           const name = document.getElementById(`pin-name-${lat}-${lng}`).value || "Unnamed Pin";
@@ -132,10 +150,10 @@ const firebaseConfig = {
         document.getElementById(`cancel-${lat}-${lng}`).onclick = () => {
           map.removeLayer(tempMarker);
         };
-      }, 300);
+      }, 200);
     });
 
-    // 🧭 Locate user’s position
+    // Locate user
     document.getElementById("locateBtn").onclick = () => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((pos) => {
@@ -145,9 +163,7 @@ const firebaseConfig = {
             .addTo(map)
             .bindPopup("📍 You are here!")
             .openPopup();
-        }, () => {
-          alert("Unable to get your location");
-        });
+        }, () => { alert("Unable to get your location"); });
       } else {
         alert("Geolocation not supported");
       }
