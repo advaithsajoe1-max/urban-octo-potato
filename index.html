@@ -18,11 +18,15 @@
 </head>
 <body>
   <button id="locateBtn">📍 Find My Location</button>
+  <button id="signInBtn">🔑 Sign in with Google</button>
+<button id="signOutBtn" style="display:none;">🚪 Sign out</button>
+
   <div id="map"></div>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 
   <script>
     // Firebase config
@@ -48,6 +52,24 @@
     }).addTo(map);
 
     const markerMap = {};
+    const auth = firebase.auth();
+const provider = new firebase.auth.GoogleAuthProvider();
+
+document.getElementById("signInBtn").onclick = () => {
+  auth.signInWithPopup(provider).then(result => {
+    alert("Signed in as " + result.user.displayName);
+    document.getElementById("signInBtn").style.display = "none";
+    document.getElementById("signOutBtn").style.display = "block";
+  }).catch(error => {
+    alert("Error: " + error.message);
+  });
+};
+
+document.getElementById("signOutBtn").onclick = () => {
+  auth.signOut();
+  document.getElementById("signInBtn").style.display = "block";
+  document.getElementById("signOutBtn").style.display = "none";
+};
 
     // Load existing pins from Firebase
     db.ref("pins").on("value", snapshot => {
@@ -130,3 +152,4 @@
   </script>
 </body>
 </html>
+
